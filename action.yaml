@@ -29,7 +29,7 @@ inputs:
   image:
     description: 'Image to be attested and pushed'
     required: false
-    default: ${{ IMAGE }}
+    default: ''
   version:
     description: 'Version of the image to be attested'
     required: false
