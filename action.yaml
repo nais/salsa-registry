@@ -38,7 +38,7 @@ inputs:
     description: 'Push to registry'
     required: false
     default: "true"
-  maven_opts:
+  salsa_mvn_opts:
     description: 'Maven options'
     required: false
     default: ''
@@ -140,6 +140,6 @@ runs:
       uses: nais/salsa@v0.6
       with:
         key: ${{ inputs.salsa_key }}
-        image: ${{ steps.docker_build_push.outputs.digest }}
+        image: ${{ steps.registry.outputs.image }}
         github_token: ${{ inputs.github_token }}
-        maven_opts: ${{ inputs.maven_opts }}
+        mvn_opts: ${{ inputs.salsa_mvn_opts }}
