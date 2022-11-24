@@ -22,6 +22,14 @@ inputs:
   salsa_key:
     description: 'Salsa key used for signing'
     required: false
+  salsa_mvn_opts:
+    description: 'Maven options'
+    required: false
+    default: ''
+  salsa_enabled:
+    description: 'Create a salsa attestation'
+    required: false
+    default: "true"
   registry:
     description: 'Registry to push to'
     required: false
@@ -37,15 +45,7 @@ inputs:
   push:
     description: 'Push to registry'
     required: false
-    default: "true"
-  salsa_mvn_opts:
-    description: 'Maven options'
-    required: false
-    default: ''
-  salsa:
-    description: 'Create a salsa attestation'
-    required: false
-    default: "true"
+    default: 'true'
   build_cmd:
     description: 'Build command'
     required: false
@@ -136,7 +136,7 @@ runs:
         credentials_json: ${{ inputs.salsa_credentials }}
 
     - name: Generate provenance, sign and upload image
-      if: ${{ inputs.salsa }}
+      if: ${{ inputs.salsa_enabled == 'true' }}
       uses: nais/salsa@v0.6
       with:
         key: ${{ inputs.salsa_key }}
