@@ -9,7 +9,7 @@ inputs:
   service_account:
     description: 'Account used for authentication to a workload federation'
     required: true
-  identiy_provider:
+  identity_provider:
     description: 'Identity provider used for authentication to a workload federation'
     required: true
   salsa_credentials:
@@ -71,7 +71,7 @@ runs:
       id: repo
       run: |
         repo=${{ github.repository }}
-        echo "name="${repo##*/}" >> $GITHUB_OUTPUT
+        echo "name=${repo##*/}" >> $GITHUB_OUTPUT
 
     - name: Set up Docker Buildx
       id: buildx
