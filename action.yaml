@@ -29,7 +29,7 @@ inputs:
   image:
     description: 'Image to be attested and pushed'
     required: false
-    default: ''
+    default: ${{ env.IMAGE }}
   version:
     description: 'Version of the image to be attested'
     required: false
@@ -46,6 +46,10 @@ inputs:
     description: 'Create a salsa attestation'
     required: false
     default: "true"
+  build_cmd:
+    description: 'Build command'
+    required: false
+    default: ''
 
 runs:
   using: "composite"
@@ -107,6 +111,12 @@ runs:
           type=semver,pattern=v{{major}}
           type=sha
           type=raw,value={{date 'YYYYMMDDhhmmss'}}-{{sha}}
+
+    - name: Build application
+      if: ${{ inputs.build_cmd != '' }}
+      shell: bash
+      run: |
+        ./gradlew build fatJar --no-daemon
 
     - name: Build and push
       uses: docker/build-push-action@v3
