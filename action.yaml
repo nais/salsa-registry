@@ -1,0 +1,135 @@
+name: 'Salsa Registry'
+description: 'Creates an attestation based on your running dependencies, signs & pushes to a registry'
+author: NAIS
+branding:
+  icon: 'lock'
+  color: 'purple'
+
+inputs:
+  service_account:
+    description: 'Account used for authentication to a workload federation'
+    required: true
+  identiy_provider:
+    description: 'Identity provider used for authentication to a workload federation'
+    required: true
+  salsa_credentials:
+    description: 'Credentials for salsa'
+    required: true
+  github_token:
+    description: 'Github token or PAT'
+    required: false
+    default: ${{ github.token }}
+  salsa_key:
+    description: 'Salsa key used for signing'
+    required: false
+  registry:
+    description: 'Registry to push to'
+    required: false
+    default: 'europe-north1-docker.pkg.dev/nais-io/nais/images'
+  image:
+    description: 'Image to be attested and pushed'
+    required: false
+    default: ""
+  version:
+    description: 'Version of the image to be attested'
+    required: false
+    default: ""
+  push:
+    description: 'Push to registry'
+    required: false
+    default: "true"
+  maven_opts:
+    description: 'Maven options'
+    required: false
+    default: ""
+  salsa:
+    description: 'Create a salsa attestation'
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - id: "auth"
+      name: "Authenticate to Google Cloud"
+      uses: google-github-actions/auth@v1.0.0
+      with:
+        workload_identity_provider: ${{ inputs.identity_provider }}
+        service_account: ${{ inputs.service_account }}
+        token_format: "access_token"
+
+    - name: Generate version
+      if: ${{ inputs.version == "" }}
+      id: version
+      shell: bash
+      run: echo "version=$(date +'%Y%m%d-%H%M%S')-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+    - name: Filter out repository name
+      shell: bash
+      id: repo
+      run: |
+        repo=${{ github.repository }}
+        echo "name="${repo##*/}" >> $GITHUB_OUTPUT
+
+    - name: Set up Docker Buildx
+      id: buildx
+      uses: docker/setup-buildx-action@v2
+    - name: Login to registry
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ inputs.registry }}
+        username: "oauth2accesstoken"
+        password: "${{ steps.auth.outputs.access_token }}"
+
+    - name: Docker image
+      id: registry
+      shell: bash
+      run: |
+        image=${{ inputs.image }}
+        if [ -z "$image" ]; then
+          image=${{ inputs.registry }}/${{ steps.repo.outputs.name }}
+        fi
+        echo "image=$image" >> $GITHUB_OUTPUT
+
+    - name: Docker meta
+      id: metadata
+      uses: docker/metadata-action@v4
+      with:
+        images: ${{ steps.registry.outputs.image }}
+        tags: |
+          type=schedule
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern=v{{version}}
+          type=semver,pattern=v{{major}}.{{minor}}
+          type=semver,pattern=v{{major}}
+          type=sha
+          type=raw,value={{date 'YYYYMMDDhhmmss'}}-{{sha}}
+
+    - name: Build and push
+      uses: docker/build-push-action@v3
+      id: docker_build_push
+      with:
+        context: .
+        file: Dockerfile
+        push: ${{ inputs.push }}
+        tags: ${{ steps.metadata.outputs.tags }}
+        labels: ${{ steps.metadata.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Authenticate to Google Cloud for salsa
+      uses: google-github-actions/auth@v1.0.0
+      with:
+        credentials_json: ${{ inputs.salsa_credentials }}
+
+    - name: Generate provenance, sign and upload image
+      if: ${{ inputs.salsa }}
+      uses: salsa-action@v0.6
+      with:
+        key: ${{ inputs.salsa_key }}
+        image: ${{ steps.docker_build_push.outputs.digest }}
+        github_token: ${{ inputs.github_token }}
+        maven_opts: ${{ inputs.maven_opts }}
