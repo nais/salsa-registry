@@ -65,10 +65,14 @@ runs:
         token_format: "access_token"
 
     - name: Generate version
-      if: ${{ inputs.version == '' }}
       id: version
       shell: bash
-      run: echo "version=$(date +'%Y%m%d-%H%M%S')-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      run: |
+        if [[ "${{ inputs.version }}" == "" ]]; then
+          echo "version=$(date +'%Y%m%d-%H%M%S')-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        else
+          echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+        fi
 
     - name: Filter out repository name
       shell: bash
@@ -110,7 +114,7 @@ runs:
           type=semver,pattern=v{{major}}.{{minor}}
           type=semver,pattern=v{{major}}
           type=sha
-          type=raw,value={{date 'YYYYMMDDhhmmss'}}-{{sha}}
+          type=raw,value=${{ steps.version.outputs.version }}
 
     - name: Build application
       if: ${{ inputs.build_cmd != '' }}
@@ -137,9 +141,12 @@ runs:
 
     - name: Generate provenance, sign and upload image
       if: ${{ inputs.salsa_enabled == 'true' }}
-      uses: nais/salsa@v0.6
+      uses: nais/salsa@v0.7
       with:
         key: ${{ inputs.salsa_key }}
+        registry: ${{ inputs.registry }}
         image: ${{ steps.registry.outputs.image }}
+        image_digest: ${{ steps.docker_build_push.outputs.digest }}
         github_token: ${{ inputs.github_token }}
+        registry_access_token: "${{ steps.auth.outputs.access_token }}"
         mvn_opts: ${{ inputs.salsa_mvn_opts }}
